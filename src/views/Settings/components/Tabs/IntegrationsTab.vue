@@ -1,7 +1,7 @@
 <template>
     <div class="flex flex-col gap-10 py-2">
         <!-- Discord Rich Presence -->
-        <SettingsGroup :title="t('view.settings.discord_presence.discord_presence.header')">
+        <SettingsGroup v-if="!isMobilePlatform" :title="t('view.settings.discord_presence.discord_presence.header')">
             <template #description>
                 <p class="m-0">{{ t('view.settings.discord_presence.discord_presence.description') }}</p>
                 <p class="m-0 cursor-pointer hover:text-foreground transition-colors" @click="showVRChatConfig">
@@ -168,6 +168,7 @@
     import YouTubeApiDialog from '../../dialogs/YouTubeApiDialog.vue';
     import SettingsGroup from '../SettingsGroup.vue';
     import SettingsItem from '../SettingsItem.vue';
+    import { isMobilePlatform } from '../../../../shared/utils/appPlatform.js';
 
     const { t } = useI18n();
 

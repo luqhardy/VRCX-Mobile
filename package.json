@@ -31,6 +31,10 @@
         "build:licenses": "node ./build-scripts/generate-third-party-licenses.js",
         "prod": "cross-env PLATFORM=windows vite build src && npm run build:licenses",
         "prod-linux": "cross-env PLATFORM=linux vite build src && npm run build:licenses",
+        "prod-mobile": "cross-env PLATFORM=mobile vite build src && npm run build:licenses",
+        "cap:sync": "npm run prod-mobile && npx cap sync",
+        "cap:run-android": "npx cap run android",
+        "cap:run-ios": "npx cap run ios",
         "build-electron": "node ./src-electron/download-dotnet-runtime.js --arch=x64 && node ./src-electron/patch-package-version.js && electron-builder --x64 --publish never",
         "build-electron-arm64": "node ./src-electron/download-dotnet-runtime.js --arch=arm64 && node ./src-electron/patch-package-version.js && electron-builder --arm64 --publish never",
         "postbuild-electron": "node ./src-electron/patch-node-api-dotnet.js --arch=x64 && node ./src-electron/rename-builds.js --arch=x64",
@@ -38,10 +42,16 @@
         "start-electron": "electron . --hot-reload"
     },
     "dependencies": {
+        "@capacitor/core": "^8.4.1",
+        "@capacitor/preferences": "^8.0.1",
         "hazardous": "^0.3.0",
-        "node-api-dotnet": "^0.9.21"
+        "node-api-dotnet": "^0.9.21",
+        "sql.js": "^1.14.1"
     },
     "devDependencies": {
+        "@capacitor/android": "^8.4.1",
+        "@capacitor/cli": "^8.4.1",
+        "@capacitor/ios": "^8.4.1",
         "@dnd-kit/vue": "^0.4.0",
         "@eslint/js": "^10.0.1",
         "@fontsource-variable/inter": "^5.2.8",

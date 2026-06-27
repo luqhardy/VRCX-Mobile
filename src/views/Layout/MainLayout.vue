@@ -15,7 +15,14 @@
                     :style="{ left: 'var(--sidebar-width)' }"
                     @pointerdown.prevent="startNavResize" />
 
-                <SidebarInset class="min-w-0 bg-sidebar">
+                <SidebarInset class="min-w-0 bg-sidebar flex flex-col h-full overflow-hidden">
+                    <!-- Mobile Header Bar -->
+                    <div
+                        v-if="isMobile"
+                        class="flex items-center h-12 border-b border-border bg-background px-4 shrink-0 z-20">
+                        <SidebarTrigger />
+                        <span class="ml-2 font-semibold text-lg text-foreground capitalize">{{ currentRouteTitle }}</span>
+                    </div>
                     <ResizablePanelGroup
                         direction="horizontal"
                         auto-save-id="vrcx-main-layout-right-sidebar"
@@ -94,10 +101,12 @@
 <script setup>
     import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
     import { storeToRefs } from 'pinia';
-    import { useRouter } from 'vue-router';
+    import { useRoute, useRouter } from 'vue-router';
+    import { useI18n } from 'vue-i18n';
+    import { useMediaQuery } from '@vueuse/core';
 
     import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../../components/ui/resizable';
-    import { SidebarInset, SidebarProvider } from '../../components/ui/sidebar';
+    import { SidebarInset, SidebarProvider, SidebarTrigger } from '../../components/ui/sidebar';
     import { useAppearanceSettingsStore } from '../../stores';
     import { useMainLayoutResizable } from '../../composables/useMainLayoutResizable';
     import { watchState } from '../../services/watchState';
@@ -124,6 +133,19 @@
     import SpotlightDialog from '../../components/onboarding/SpotlightDialog.vue';
 
     const router = useRouter();
+    const route = useRoute();
+    const { t, te } = useI18n();
+
+    const isMobile = useMediaQuery('(max-width: 768px)');
+
+    const currentRouteTitle = computed(() => {
+        if (!route.name) return '';
+        const key = `nav_tooltip.${route.name.replaceAll('-', '_')}`;
+        if (te(key)) {
+            return t(key);
+        }
+        return route.name.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    });
 
     const appearanceSettingsStore = useAppearanceSettingsStore();
     const { navWidth, isNavCollapsed } = storeToRefs(appearanceSettingsStore);

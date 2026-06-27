@@ -166,12 +166,33 @@ export default defineConfig(({ mode }) => {
         define: {
             LINUX: JSON.stringify(process.env.PLATFORM === 'linux'),
             WINDOWS: JSON.stringify(process.env.PLATFORM === 'windows'),
+            MOBILE: JSON.stringify(process.env.PLATFORM === 'mobile'),
             VERSION: JSON.stringify(version),
             NIGHTLY: JSON.stringify(nightly)
         },
         server: {
             port: 9000,
-            strictPort: true
+            strictPort: true,
+            proxy: {
+                '/vrchat-api': {
+                    target: 'https://api.vrchat.cloud',
+                    changeOrigin: true,
+                    rewrite: (path) => path.replace(/^\/vrchat-api/, ''),
+                    headers: {
+                        Referer: 'https://api.vrchat.cloud/',
+                        Origin: 'https://api.vrchat.cloud'
+                    }
+                },
+                '/vrchat-files': {
+                    target: 'https://files.vrchat.cloud',
+                    changeOrigin: true,
+                    rewrite: (path) => path.replace(/^\/vrchat-files/, ''),
+                    headers: {
+                        Referer: 'https://files.vrchat.cloud/',
+                        Origin: 'https://files.vrchat.cloud'
+                    }
+                }
+            }
         },
         build: {
             target: 'chrome145',
