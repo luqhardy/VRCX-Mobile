@@ -1,4 +1,3 @@
-````markdown
 <div align="center">
 
 # ⚠️ WORK IN PROGRESS - FOR PERSONAL USE - NO RESPONSIBILITY TAKEN ⚠️
@@ -36,7 +35,6 @@ Clone the repository and install the Node packages:
 ```bash
 npm install
 ```
-````
 
 ### 2. Build the Web App for Mobile
 
