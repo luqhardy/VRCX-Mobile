@@ -2,7 +2,44 @@ import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import initSqlJs from 'sql.js/dist/sql-asm.js';
 
+import { getColourFromUserId } from './mobileColour.js';
+
 const isNative = Capacitor.isNativePlatform();
+
+/**
+ * Creates a stub for a C# bridge object. Known methods come from `overrides`,
+ * anything else resolves to an async no-op returning null so unported
+ * desktop features degrade gracefully instead of throwing TypeErrors.
+ * @param {string} name Bridge name used in debug logs.
+ * @param {Record<string, Function>} overrides Methods with real implementations or typed defaults.
+ * @returns {any}
+ */
+function createBridgeStub(name, overrides = {}) {
+    return new Proxy(overrides, {
+        get(target, prop) {
+            if (prop in target) {
+                return target[prop];
+            }
+            // 'then'/'toJSON'/symbols must stay undefined so the stub isn't
+            // mistaken for a thenable or serialized as a function.
+            if (
+                typeof prop === 'symbol' ||
+                prop === 'then' ||
+                prop === 'toJSON'
+            ) {
+                return undefined;
+            }
+            return async (...args) => {
+                console.debug(
+                    `[${name} stub] ${String(prop)}(`,
+                    ...args,
+                    ') → noop'
+                );
+                return null;
+            };
+        }
+    });
+}
 
 function openDatabase() {
     return new Promise((resolve, reject) => {
@@ -62,15 +99,34 @@ async function saveDatabaseFile(data) {
 }
 
 export async function initMobileApis() {
-    // Use a Proxy to silently no-op any AppApi method call without listing them all.
-    // This covers AppApi.CustomCss(), AppApi.GetVersion(), AppApi.SetUserAgent(), etc.
-    window.AppApi = new Proxy({}, {
-        get(_, methodName) {
-            return async (...args) => {
-                console.debug(`[AppApi stub] ${methodName}(`, ...args, ') → noop');
-                return null;
-            };
-        }
+    // Known AppApi methods get real mobile implementations; everything else
+    // (desktop/VR-only features) silently no-ops via the Proxy fallback.
+    window.AppApi = createBridgeStub('AppApi', {
+        GetVersion: async () => VERSION,
+        CurrentCulture: async () => navigator.language || 'en',
+        CurrentLanguage: async () => navigator.language || 'en',
+        GetColourFromUserID: async (userId) => getColourFromUserId(userId),
+        GetColourBulk: async (userIds) => {
+            const colours = {};
+            for (const userId of userIds ?? []) {
+                colours[userId] = getColourFromUserId(userId);
+            }
+            return colours;
+        },
+        OpenLink: async (url) => {
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                window.open(url, '_blank');
+            }
+        },
+        GetClipboard: async () => {
+            try {
+                return (await navigator.clipboard.readText()) || '';
+            } catch {
+                return '';
+            }
+        },
+        IsGameRunning: async () => false,
+        IsSteamVRRunning: async () => false
     });
 
     window.WebApi = {
@@ -85,24 +141,36 @@ export async function initMobileApis() {
                         url,
                         method,
                         headers: headers || {},
-                        data: body ? JSON.parse(body) : undefined,
+                        data: body ? JSON.parse(body) : undefined
                     });
-                    dataString = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+                    dataString =
+                        typeof response.data === 'string'
+                            ? response.data
+                            : JSON.stringify(response.data);
                     status = response.status;
                 } else {
                     // Browser dev mode: use regular fetch (CORS will apply)
                     // Redirect through Vite dev server proxy to bypass CORS
                     let proxiedUrl = url;
                     if (url.startsWith('https://api.vrchat.cloud/')) {
-                        proxiedUrl = url.replace('https://api.vrchat.cloud/', '/vrchat-api/');
+                        proxiedUrl = url.replace(
+                            'https://api.vrchat.cloud/',
+                            '/vrchat-api/'
+                        );
                     } else if (url.startsWith('https://files.vrchat.cloud/')) {
-                        proxiedUrl = url.replace('https://files.vrchat.cloud/', '/vrchat-files/');
+                        proxiedUrl = url.replace(
+                            'https://files.vrchat.cloud/',
+                            '/vrchat-files/'
+                        );
                     }
                     const response = await fetch(proxiedUrl, {
                         method,
-                        headers: { 'Content-Type': 'application/json', ...headers },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...headers
+                        },
                         body: body || undefined,
-                        credentials: 'include',
+                        credentials: 'include'
                     });
                     dataString = await response.text();
                     status = response.status;
@@ -175,7 +243,10 @@ export async function initMobileApis() {
         const SQL = await initSqlJs();
         const savedDbData = await loadDatabaseFile();
         dbInstance = new SQL.Database(savedDbData || undefined);
-        console.log('[SQLite] Database loaded. Size:', savedDbData ? savedDbData.byteLength : 0);
+        console.log(
+            '[SQLite] Database loaded. Size:',
+            savedDbData ? savedDbData.byteLength : 0
+        );
     } catch (err) {
         console.error('[SQLite] Failed to initialize database:', err);
     }
@@ -200,7 +271,9 @@ export async function initMobileApis() {
     window.SQLite = {
         Execute: async (sql, args) => {
             if (!dbInstance) {
-                console.warn('[SQLite] Execute called before database initialized');
+                console.warn(
+                    '[SQLite] Execute called before database initialized'
+                );
                 return [];
             }
             try {
@@ -211,7 +284,14 @@ export async function initMobileApis() {
                 }
                 return res[0].values;
             } catch (err) {
-                console.error('[SQLite] Execute Error:', err, 'SQL:', sql, 'Args:', args);
+                console.error(
+                    '[SQLite] Execute Error:',
+                    err,
+                    'SQL:',
+                    sql,
+                    'Args:',
+                    args
+                );
                 throw err;
             }
         },
@@ -221,7 +301,9 @@ export async function initMobileApis() {
         },
         ExecuteNonQuery: async (sql, args) => {
             if (!dbInstance) {
-                console.warn('[SQLite] ExecuteNonQuery called before database initialized');
+                console.warn(
+                    '[SQLite] ExecuteNonQuery called before database initialized'
+                );
                 return 0;
             }
             try {
@@ -231,17 +313,36 @@ export async function initMobileApis() {
                 queueSave();
                 return rowsModified;
             } catch (err) {
-                console.error('[SQLite] ExecuteNonQuery Error:', err, 'SQL:', sql, 'Args:', args);
+                console.error(
+                    '[SQLite] ExecuteNonQuery Error:',
+                    err,
+                    'SQL:',
+                    sql,
+                    'Args:',
+                    args
+                );
                 throw err;
             }
         }
     };
 
-    window.LogWatcher = {};
-    window.Discord = {
-        Init: () => {},
-        Update: () => {},
-        Shutdown: () => {}
-    };
-    window.AssetBundleManager = {};
+    // VRChat never runs on this device, so the log watcher reports no lines
+    // and the game log flows settle immediately.
+    window.LogWatcher = createBridgeStub('LogWatcher', {
+        Get: async () => [],
+        GetLogLines: async () => []
+    });
+
+    // Discord RPC needs the desktop Discord client; report inactive.
+    window.Discord = createBridgeStub('Discord', {
+        SetActive: async () => false
+    });
+
+    // No local VRChat cache exists on mobile; report empty/missing cache.
+    window.AssetBundleManager = createBridgeStub('AssetBundleManager', {
+        GetCacheSize: async () => 0,
+        SweepCache: async () => '',
+        GetVRChatCacheFullLocation: async () => '',
+        CheckVRChatCache: async () => ({ Item1: -1, Item2: false, Item3: '' })
+    });
 }
